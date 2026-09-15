@@ -1,0 +1,8 @@
+.comparison-chart {
+  width: 100%;
+  margin: var(--space-3) 0;
+}
+
+.comparison-chart .recharts-cartesian-axis-tick text {
+  font-family: var(--font-mono);
+}
