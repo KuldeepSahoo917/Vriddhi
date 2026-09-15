@@ -1,0 +1,43 @@
+.landing-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--border-strong);
+  z-index: 0;
+}
+
+.landing-decor__shape {
+  position: absolute;
+  opacity: 0.3;
+}
+
+.landing-decor__shape--card {
+  top: 6%;
+  left: 2%;
+  width: 80px;
+}
+
+.landing-decor__shape--stamp {
+  top: 8%;
+  right: 4%;
+  width: 70px;
+}
+
+.landing-decor__shape--rules {
+  bottom: 10%;
+  left: 0%;
+  width: 110px;
+}
+
+.landing-decor__shape--rupee {
+  bottom: 4%;
+  right: 5%;
+  width: 54px;
+}
+
+@media (max-width: 700px) {
+  .landing-decor {
+    display: none;
+  }
+}
