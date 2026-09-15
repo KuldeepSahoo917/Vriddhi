@@ -1,0 +1,25 @@
+.slider-field {
+  margin-bottom: var(--space-4);
+}
+
+.slider-field__row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.slider-field__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.slider-field__value {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.slider-field input[type='range'] {
+  width: 100%;
+  accent-color: var(--text-accent);
+}
