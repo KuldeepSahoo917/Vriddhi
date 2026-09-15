@@ -1,0 +1,65 @@
+.stamp-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 1.15;
+  font-family: var(--font-mono);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.stamp-badge--md {
+  width: 46px;
+  height: 46px;
+}
+
+.stamp-badge--sm {
+  width: 34px;
+  height: 34px;
+}
+
+.stamp-badge__label {
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+}
+
+.stamp-badge--sm .stamp-badge__label {
+  font-size: 8px;
+}
+
+.stamp-badge__sublabel {
+  font-size: 8px;
+}
+
+.stamp-badge--sm .stamp-badge__sublabel {
+  font-size: 7px;
+}
+
+.stamp-badge--reached {
+  border: 2px solid var(--border-accent);
+  color: var(--text-accent);
+}
+
+.stamp-badge--locked {
+  border: 2px dashed var(--border);
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stamp-badge--reached {
+    animation: stamp-in 240ms ease-out;
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: scale(1.4) rotate(var(--stamp-rotate, -8deg));
+  }
+  to {
+    opacity: 1;
+  }
+}
