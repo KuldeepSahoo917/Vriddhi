@@ -1,0 +1,15 @@
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  height: 100%;
+}
+
+.reveal > * {
+  height: 100%;
+}
+
+.reveal--visible {
+  opacity: 1;
+  transform: none;
+}
