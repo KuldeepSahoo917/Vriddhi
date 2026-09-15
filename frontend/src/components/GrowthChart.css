@@ -1,0 +1,8 @@
+.growth-chart {
+  width: 100%;
+  margin: var(--space-2) 0;
+}
+
+.growth-chart .recharts-cartesian-axis-tick text {
+  font-family: var(--font-mono);
+}
