@@ -1,0 +1,34 @@
+.ledger-row {
+  position: relative;
+  display: grid;
+  align-items: center;
+  padding: 10px 4px;
+  border-top: 0.5px dashed var(--border);
+  min-width: 420px; /* prevents columns crushing illegibly on narrow screens */
+}
+
+.ledger-row--last {
+  border-bottom: 0.5px solid var(--border-strong);
+}
+
+.ledger-row--header {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border-top: none;
+  border-bottom: 0.5px solid var(--border-strong);
+  padding: 8px 4px;
+}
+
+.ledger-row--data {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.ledger-row__cell--right {
+  text-align: right;
+}
+
+.ledger-row__cell--emphasize {
+  font-weight: var(--weight-medium);
+}
