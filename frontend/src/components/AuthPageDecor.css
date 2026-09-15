@@ -1,0 +1,44 @@
+.auth-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--border-strong);
+}
+
+.auth-decor__shape {
+  position: absolute;
+  opacity: 0.35;
+}
+
+.auth-decor__shape--card {
+  top: 8%;
+  left: 6%;
+  width: 90px;
+}
+
+.auth-decor__shape--stamp {
+  top: 10%;
+  right: 7%;
+  width: 80px;
+}
+
+.auth-decor__shape--rules {
+  bottom: 14%;
+  left: 4%;
+  width: 130px;
+}
+
+.auth-decor__shape--rupee {
+  bottom: 6%;
+  right: 8%;
+  width: 60px;
+}
+
+/* Hide on narrow viewports — the card itself needs the room, and
+   there's no space left for ambient decoration without clutter. */
+@media (max-width: 700px) {
+  .auth-decor {
+    display: none;
+  }
+}
