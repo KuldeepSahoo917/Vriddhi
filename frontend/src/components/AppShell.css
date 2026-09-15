@@ -1,0 +1,138 @@
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 0.5px solid var(--border);
+}
+
+.app-shell__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-shell__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-shell__nav-link {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.app-shell__nav-link:hover {
+  color: var(--text-accent);
+}
+
+.app-shell__nav-button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.app-shell__logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.app-shell__name {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+.app-shell__tagline {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.app-shell__main {
+  flex: 1;
+}
+
+.app-shell__footer {
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-5);
+  border-top: 0.5px solid var(--border);
+}
+
+.app-shell__footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.app-shell__footer-copy {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.app-shell__footer-social {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.app-shell__footer-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+}
+
+.app-shell__footer-icon:hover {
+  color: var(--text-accent);
+}
+
+.app-shell__footer-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 480px) {
+  .app-shell__footer-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .app-shell__tagline {
+    display: none;
+  }
+
+  .app-shell__nav {
+    width: 100%;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+}
