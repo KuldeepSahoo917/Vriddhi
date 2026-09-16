@@ -1,0 +1,109 @@
+.calculator-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.calculator-page__tabs {
+  display: flex;
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.calculator-page__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.calculator-page__tab {
+  background: none;
+  border: none;
+  padding: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.calculator-page__tab--active {
+  color: var(--text-accent);
+  border-bottom-color: var(--border-accent);
+}
+
+.calculator-page__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+@media (max-width: 560px) {
+  .calculator-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.calculator-page__field {
+  margin-bottom: var(--space-4);
+}
+
+.calculator-page__field-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: var(--space-2);
+}
+
+.calculator-page__field input,
+.calculator-page__field select {
+  width: 100%;
+}
+
+.calculator-page__result {
+  position: relative;
+  border-top: 0.5px solid var(--border-strong);
+  border-bottom: 0.5px solid var(--border-strong);
+  padding: var(--space-3) 0;
+  min-height: 120px;
+}
+
+.calculator-page__result-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0 0 2px;
+}
+
+.calculator-page__result-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-medium);
+  margin: 0 0 var(--space-3);
+}
+
+.calculator-page__breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 0.5px dashed var(--border);
+  font-size: var(--text-xs);
+}
+
+.calculator-page__breakdown-row span:first-child {
+  color: var(--text-muted);
+}
+
+.calculator-page__stamp {
+  position: absolute;
+  right: 6px;
+  top: -14px;
+}
+
+.calculator-page__ledger {
+  margin-top: var(--space-6);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
