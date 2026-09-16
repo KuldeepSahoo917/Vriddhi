@@ -1,0 +1,108 @@
+/*
+  Vriddhi Design Tokens
+  ---------------------
+  Direction: Indian bank-passbook ledger. Warm paper neutrals,
+  ink-blue as primary accent (verification stamp), maroon as
+  sparing secondary accent (milestone / alert ink).
+
+  Type roles:
+    --font-display : Lora (serif) — headers, ledger titles
+    --font-body    : Inter (sans) — UI copy
+    --font-mono    : IBM Plex Mono — all financial figures
+
+  Do not hardcode colors/fonts anywhere else in the app.
+  Every component reads from these variables only.
+*/
+
+:root {
+  /* ---- Color: light mode (default) ---- */
+  /* Navy and gold sampled directly from the Vriddhi logo. */
+  --bg-page: #FAF7F0;           /* aged ledger paper */
+  --bg-surface: #FFFFFF;
+  --bg-surface-2: #F1ECE0;
+  --bg-accent: #E5EAF1;         /* navy tint */
+  --bg-gold: #FFF4D6;           /* gold tint, sparing use */
+  --bg-danger: #F7E9E6;
+
+  --text-primary: #1A1712;
+  --text-secondary: #6B6459;
+  --text-muted: #6E6759;
+  --text-accent: #051F48;       /* logo navy */
+  --text-gold: #B8860B;         /* darkened gold for AA contrast on light bg */
+  --text-danger: #8C3B2E;       /* stamp maroon, kept for error/alert only */
+  --text-on-accent: #FFFFFF;
+
+  --border: #E4DDCC;
+  --border-strong: #C9C0AA;
+  --border-accent: #051F48;
+  --border-gold: #FEC609;
+  --border-danger: #8C3B2E;
+
+  /* Primary CTA button: distinct from the ink-blue link/accent color
+     so it reads as a clear "do this" action, matching passbook ink
+     hierarchy (verification stamp vs. action stamp). */
+  --cta-bg: #051F48;
+  --cta-text: #FFFFFF;
+
+  --radius: 8px;
+  --radius-sm: 4px;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* ---- Type ---- */
+  --font-display: 'Lora', Georgia, serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+}
+
+[data-theme='dark'] {
+  --bg-page: #12161F;           /* near-navy, darker than logo bg for depth */
+  --bg-surface: #1A2030;
+  --bg-surface-2: #212840;
+  --bg-accent: #1F2B4A;
+  --bg-gold: #3A2E0E;
+  --bg-danger: #34211C;
+
+  --text-primary: #ECE7DA;
+  --text-secondary: #B4AC9A;
+  --text-muted: #948C7A;
+  --text-accent: #7DA0D6;       /* lightened navy for dark-mode contrast */
+  --text-gold: #FEC609;         /* full logo gold pops nicely on dark */
+  --text-danger: #C97A68;
+  --text-on-accent: #051F48;
+
+  --border: #2A3244;
+  --border-strong: #3A4358;
+  --border-accent: #7DA0D6;
+  --border-gold: #FEC609;
+  --border-danger: #C97A68;
+
+  --cta-bg: #FEC609;
+  --cta-text: #051F48;
+}
+
+/* Respect reduced motion preference globally */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
