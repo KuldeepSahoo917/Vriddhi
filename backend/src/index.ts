@@ -36,6 +36,10 @@ const advisorLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20 });
 
 app.use(generalLimiter);
 
+app.get('/', (_req, res) => {
+  res.send('Vriddhi backend is running');
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
