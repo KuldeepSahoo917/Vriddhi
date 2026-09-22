@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: vriddhi-backend
+    env_file:
+      - ./backend/.env
+    expose:
+      - "4000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: vriddhi-frontend
+    ports:
+      - "1919:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
