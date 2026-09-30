@@ -14,9 +14,28 @@ pipeline {
             }
         }
 
+        stage('Configure Environment') {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'vriddhi-backend-env',
+                        variable: 'BACKEND_ENV'
+                    ),
+                    file(
+                        credentialsId: 'vriddhi-frontend-env',
+                        variable: 'FRONTEND_ENV'
+                    )
+                ]) {
+                    sh '''
+                        cp "$BACKEND_ENV" backend/.env
+                        cp "$FRONTEND_ENV" .env
+                    '''
+                }
+            }
+        }
+
         stage('Docker Check') {
             steps {
-                echo 'Checking Docker installation...'
                 sh 'docker --version'
                 sh 'docker compose version'
             }
@@ -25,7 +44,7 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 echo 'Building frontend and backend Docker images...'
-                sh 'docker compose build --no-cache'
+                sh 'docker compose build'
             }
         }
 
@@ -62,6 +81,7 @@ pipeline {
         }
 
         always {
+            sh 'rm -f backend/.env .env || true'
             echo 'Jenkins pipeline finished.'
         }
     }
