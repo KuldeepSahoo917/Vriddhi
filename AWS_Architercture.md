@@ -145,6 +145,431 @@ This configuration allows the Node.js and Express backend instances to access ex
 | `10.0.0.0/16` | Local |
 | `0.0.0.0/0` | NAT Gateway |
 
-The Database Tier does not have a default internet route through the NAT Gateway. This restricts general outbound internet connectivity while allowing internal communication within the VPC.
+The Database Tier does not have a default internet route through the NAT Gateway. This restricts general outbound internet connectivity while allowing internal communication within the VPC. During MongoDB installation, a NAT route was temporarily added to download required packages and was removed after installation.
+
+This keeps the database subnet without general outbound internet access while allowing private communication within the VPC.
+
+---
+
+## Phase 2 – Security Groups
+
+Security Groups were configured to control inbound traffic between the different tiers. Each tier has a dedicated Security Group so that only the required sources can access its resources.
+
+### 2.1 Bastion Security Group
+
+**Security Group:** `Vriddhi-Bastion-SG`
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| SSH | TCP | 22 | Administrator public IP (`/32`) | Allows the administrator to SSH into the Bastion Host |
+
+SSH access is restricted to the administrator's public IP rather than being opened to all IPv4 addresses.
+
+### 2.2 Web Load Balancer Security Group
+
+**Security Group:** `Vriddhi-WebALB-SG`
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| HTTP | TCP | 80 | `0.0.0.0/0` | Allows public HTTP requests to reach the Web Load Balancer |
+
+HTTPS was not configured at this stage because an ACM certificate had not been configured.
+
+### 2.3 Web Server Security Group
+
+**Security Group:** `Vriddhi-Web-SG`
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| HTTP | TCP | 80 | `Vriddhi-WebALB-SG` | Allows the Web Load Balancer to reach Nginx |
+| SSH | TCP | 22 | `Vriddhi-Bastion-SG` | Allows administrative SSH through Bastion |
+
+The Web EC2 instances are not directly open to the internet. HTTP access is allowed from the Web Load Balancer Security Group.
+
+### 2.4 Application Load Balancer Security Group
+
+**Security Group:** `Vriddhi-AppALB-SG`
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| HTTP | TCP | 80 | `Vriddhi-Web-SG` | Allows the Web tier to reach the internal Application Load Balancer |
+
+The Application Load Balancer is internal and is intended to receive traffic from the Web tier, not directly from the public internet.
+
+### 2.5 Application Server Security Group
+
+**Security Group:** `Vriddhi-App-SG`
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| Custom TCP | TCP | 4000 | `Vriddhi-AppALB-SG` | Allows the Application Load Balancer to reach the Node.js/Express backend |
+| SSH | TCP | 22 | `Vriddhi-Bastion-SG` | Allows administrative SSH through Bastion |
+
+The backend listens on port `4000`. The application EC2 instances are not intended to accept direct public traffic.
+
+### 2.6 Database Security Group
+
+**Security Group:** `Vriddhi-Database-SG`
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| Custom TCP | TCP | 27017 | `Vriddhi-App-SG` | Allows the backend to connect to MongoDB |
+| SSH | TCP | 22 | `Vriddhi-Bastion-SG` | Allows administrative SSH through Bastion |
+
+MongoDB's default port `27017` is allowed from the Application Security Group, not from the public internet.
+
+### 2.7 Additional Rule for MongoDB Compass
+
+During MongoDB Compass connectivity setup, an additional inbound rule was added to `Vriddhi-Database-SG`.
+
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---:|---|---|
+| Custom TCP | TCP | 27017 | `Vriddhi-Bastion-SG` | Allows the Bastion Host to forward the Compass SSH-tunnel connection to MongoDB |
+
+This rule was required because the SSH tunnel forwards traffic through Bastion, and Bastion must be allowed to reach MongoDB on port `27017`.
+
+**Security note:** This is a Security Group reference, not a public CIDR rule. Do not open MongoDB to `0.0.0.0/0`. The Bastion-to-database rule can be removed when Compass access through the Bastion is no longer needed.
+
+Default outbound rules were retained for the Security Groups.
+
+---
+
+## Phase 3 – Bastion Host and MongoDB EC2 Provisioning
+
+### 3.1 Bastion Host Creation
+
+Launched an EC2 instance to act as the secure administrative entry point to private instances.
+
+| Configuration | Value |
+|---|---|
+| Instance Name | `Vriddhi-Bastion` |
+| Operating System | Ubuntu 26.04.1 LTS |
+| Public IP | `13.127.133.75` |
+| Private IP | `10.0.1.67` |
+| Subnet | `Public-Subnet-A` |
+| Security Group | `Vriddhi-Bastion-SG` |
+| SSH Username | `ubuntu` |
+| Key Pair | `Vriddhi.pem` |
+
+**Purpose of Bastion Host:**
+
+- Provides a controlled SSH entry point into the VPC.
+- Allows administrators to reach private EC2 instances.
+- Avoids assigning public IP addresses to private application and database instances.
+- Keeps administrative access separate from normal application traffic.
+
+### 3.2 MongoDB EC2 Creation
+
+Launched a private EC2 instance to host MongoDB Community Server.
+
+| Configuration | Value |
+|---|---|
+| Instance Name | `Vriddhi-MongoDB` |
+| Operating System | Ubuntu 26.04.1 LTS |
+| Public IP | None |
+| Private IP | `10.0.21.198` |
+| Subnet | `Private-DB-Subnet-A` |
+| Security Group | `Vriddhi-Database-SG` |
+| SSH Username | `ubuntu` |
+| Key Pair | `Vriddhi.pem` |
+
+The MongoDB instance was launched without a public IP. It is accessed administratively through the Bastion Host and accessed by the backend through its private IP.
+
+**Database deployment decision:** One MongoDB EC2 instance was deployed initially. Although two DB subnets exist across two Availability Zones, a second MongoDB instance, replica set, and automatic failover have not been configured. The current database instance is therefore a single point of failure.
+
+---
+
+## Phase 4 – MongoDB Installation and Configuration
+
+### 4.1 MongoDB Installation
+
+Installed MongoDB Community Server 9.0 on `Vriddhi-MongoDB`.
+
+The MongoDB 9.0 signing key and Ubuntu `resolute` package repository were configured before installing the `mongodb-org` packages. The exact key-import and repository-add command lines were not retained in the session notes and are therefore not reproduced here.
+
+### 4.2 Start and Verify MongoDB
+
+Restarted the MongoDB service:
+
+```bash
+sudo systemctl restart mongod
+```
+
+Checked the service status:
+
+```bash
+sudo systemctl status mongod
+```
+
+MongoDB was confirmed to be running and was enabled to start automatically at boot.
+
+### 4.3 Configure MongoDB Network Binding and Authentication
+
+Opened the MongoDB configuration file:
+
+```bash
+sudo nano /etc/mongod.conf
+```
+
+Configured the relevant settings:
+
+```yaml
+net:
+  port: 27017
+  bindIp: 127.0.0.1,10.0.21.198
+
+security:
+  authorization: enabled
+```
+
+**Configuration explanation:**
+
+- `port: 27017` – MongoDB listens on its default port.
+- `127.0.0.1` – Allows local connections from the MongoDB EC2 instance.
+- `10.0.21.198` – Allows connections through the instance's private network interface.
+- `authorization: enabled` – Requires database clients to authenticate.
+
+Saved the file and restarted MongoDB:
+
+```bash
+sudo systemctl restart mongod
+sudo systemctl status mongod
+```
+
+### 4.4 Verify MongoDB Using MongoDB Shell
+
+Opened MongoDB Shell:
+
+```bash
+mongosh
+```
+
+Executed a ping command:
+
+```javascript
+db.runCommand({ ping: 1 })
+```
+
+Expected successful response:
+
+```javascript
+{ ok: 1 }
+```
+
+This confirmed that MongoDB was responding.
+
+### 4.5 Create the Administrative User
+
+In MongoDB Shell:
+
+```javascript
+use admin
+
+db.createUser({
+  user: "vriddhiAdmin",
+  pwd: passwordPrompt(),
+  roles: [
+    { role: "root", db: "admin" }
+  ]
+})
+```
+
+The password was entered interactively and is not stored in this README.
+
+### 4.6 Create the Application Database and User
+
+Selected the application database:
+
+```javascript
+use vriddhi
+```
+
+Created the application user:
+
+```javascript
+db.createUser({
+  user: "vriddhiApp",
+  pwd: passwordPrompt(),
+  roles: [
+    { role: "readWrite", db: "vriddhi" }
+  ]
+})
+```
+
+The `vriddhiApp` user has read/write permissions on the `vriddhi` database.
+
+### 4.7 Test MongoDB User Authentication
+
+Tested the administrative user:
+
+```bash
+mongosh -u vriddhiAdmin --authenticationDatabase admin -p
+```
+
+Tested the application user:
+
+```bash
+mongosh -u vriddhiApp --authenticationDatabase vriddhi -p
+```
+
+After logging in as the application user:
+
+```javascript
+use vriddhi
+db.runCommand({ ping: 1 })
+```
+
+A successful `{ ok: 1 }` response confirmed authenticated database access.
+
+Exited MongoDB Shell using:
+
+```javascript
+exit
+```
+
+**Application security:** The backend must use `vriddhiApp` for database access. The `vriddhiAdmin` account is reserved for administration.
+
+---
+
+## Phase 5 – SSH Access Through Bastion
+
+### 5.1 Configure SSH on Windows
+
+Configured the Windows SSH client file:
+
+```text
+C:\Users\<WINDOWS_USER>\.ssh\config
+```
+
+Added the following host aliases:
+
+```sshconfig
+Host vriddhi-bastion
+    HostName 13.127.133.75
+    User ubuntu
+    IdentityFile C:/Users/<WINDOWS_USER>/Downloads/Vriddhi.pem
+    IdentitiesOnly yes
+
+Host vriddhi-mongodb
+    HostName 10.0.21.198
+    User ubuntu
+    IdentityFile C:/Users/<WINDOWS_USER>/Downloads/Vriddhi.pem
+    IdentitiesOnly yes
+    ProxyJump vriddhi-bastion
+```
+
+Replace `<WINDOWS_USER>` with the actual Windows profile folder name.
+
+### 5.2 Verify SSH Configuration
+
+Executed in Windows PowerShell:
+
+```powershell
+ssh -G vriddhi-bastion | Select-String "hostname|user|identityfile"
+```
+
+This was used to verify the SSH alias, hostname, username, and identity file.
+
+### 5.3 Connect to Bastion
+
+From Windows CMD or PowerShell:
+
+```powershell
+ssh -i "C:\Users\<WINDOWS_USER>\Downloads\Vriddhi.pem" ubuntu@13.127.133.75
+```
+
+A successful connection displayed a prompt similar to:
+
+```text
+ubuntu@ip-10-0-1-67:~$
+```
+
+### 5.4 Connect to MongoDB Through ProxyJump
+
+From Windows CMD or PowerShell, executed:
+
+```powershell
+ssh vriddhi-mongodb
+```
+
+The SSH configuration automatically routes the connection through `vriddhi-bastion` to the MongoDB private IP `10.0.21.198`.
+
+To exit an SSH session:
+
+```bash
+exit
+```
+
+**Private-key security:** The `Vriddhi.pem` private key remains on the Windows laptop. It is not copied to the Bastion Host.
+
+---
+
+## Phase 6 – MongoDB Compass Connectivity
+
+### 6.1 Configure SSH Local Port Forwarding
+
+MongoDB Compass was used as a graphical client on the Windows laptop. Since MongoDB is in a private subnet, an SSH tunnel was configured through Bastion.
+
+Executed in a Windows terminal:
+
+```powershell
+ssh -N -L 27018:10.0.21.198:27017 vriddhi-bastion
+```
+
+The terminal must remain open while MongoDB Compass is using the tunnel.
+
+### 6.2 MongoDB Compass Connection String
+
+Used the following connection string in MongoDB Compass:
+
+```text
+mongodb://vriddhiApp:<PASSWORD>@localhost:27018/vriddhi?authSource=vriddhi
+```
+
+Replace `<PASSWORD>` with the actual password for `vriddhiApp`.
+
+### 6.3 Connection Flow
+
+```text
+MongoDB Compass on Windows
+          |
+          v
+Windows localhost:27018
+          |
+          v
+SSH local port forwarding
+          |
+          v
+Bastion Host (13.127.133.75)
+          |
+          v
+MongoDB EC2 (10.0.21.198:27017)
+```
+
+Initially, the tunnel could not reach MongoDB because the Database Security Group did not allow the Bastion Security Group to connect to port `27017`. After adding the Bastion Security Group as the source for TCP `27017`, Compass connected successfully.
+
+---
+
+## Phase 7 – Backend Database Connection Configuration
+
+When the Node.js backend is deployed on the private Application EC2, the backend environment variable will use the MongoDB private IP directly.
+
+```env
+MONGODB_URI=mongodb://vriddhiApp:<PASSWORD>@10.0.21.198:27017/vriddhi?authSource=vriddhi
+```
+
+Replace `<PASSWORD>` with the actual application-user password.
+
+This connection is used by the backend inside the VPC. It does not use the Compass SSH tunnel or Bastion.
+
+When migrating the backend connection from MongoDB Atlas to the self-managed MongoDB EC2:
+
+- Update the backend `MONGODB_URI` environment variable.
+- Keep the existing Mongoose models and schemas.
+- Keep the existing CRUD operations.
+- Migrate existing Atlas data separately if it is required; changing the connection string does not copy data.
+
+---
+
 
 ---
