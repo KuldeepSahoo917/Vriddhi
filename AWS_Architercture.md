@@ -143,6 +143,7 @@ This configuration allows the Node.js and Express backend instances to access ex
 | Destination | Target |
 |---|---|
 | `10.0.0.0/16` | Local |
+| `0.0.0.0/0` | NAT Gateway |
 
 The Database Tier does not have a default internet route through the NAT Gateway. This restricts general outbound internet connectivity while allowing internal communication within the VPC.
 
