@@ -280,6 +280,13 @@ The MongoDB instance was launched without a public IP. It is accessed administra
 
 ---
 
+### IMPORTANT: ALTERNATIVES: 
+Session Manager(SSM) for managing private EC2 instances, because it avoids maintaining a jump server and managing SSH keys.
+EC2 Instance Connect Endpoint(EICE)
+VPN Connection
+
+---
+
 ## Phase 4 – SSH Access Through Bastion
 
 ### 4.1 Configuring Jump Server when Required on Windows
