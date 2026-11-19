@@ -593,6 +593,266 @@ When migrating the backend connection from MongoDB Atlas to the self-managed Mon
 - Migrate existing Atlas data separately if it is required; changing the connection string does not copy data.
 
 ---
+## Phase 8 -- Create Target Groups and Load Balancers
 
+The application uses separate load balancers for the Web and Application
+tiers.
 
+### 8.1 Application Target Group
+
+Created target group:
+
+-   **Name:** `Vriddhi-App-TG`
+-   **Target type:** Instances
+-   **Protocol:** HTTP
+-   **Port:** 4000
+-   **VPC:** `Vriddhi-VPC`
+-   **Health check path:** `/health`
+-   **Success code:** `200`
+-   Registered the existing App EC2 instance, `Vriddhi-App`.
+
+The target became **Healthy**.
+
+### 8.2 Internal Application Load Balancer
+
+Created:
+
+-   **Name:** `Vriddhi-App-ALB`
+-   **Scheme:** Internal
+-   **IP address type:** IPv4
+-   **VPC:** `Vriddhi-VPC`
+-   **Subnets:** `Private-App-Subnet-A` and `Private-App-Subnet-B`
+-   **Security group:** `Vriddhi-AppALB-SG`
+-   **Listener:** HTTP, port 80
+-   **Default action:** Forward to `Vriddhi-App-TG`
+
+The internal ALB DNS name is:
+
+``` text
+internal-Vriddhi-App-ALB-2137928074.ap-south-1.elb.amazonaws.com
+```
+
+The App target group was verified as **Healthy**.
+
+### 8.3 Web Target Group
+
+Created target group:
+
+-   **Name:** `Vriddhi-Web-TG`
+-   **Target type:** Instances
+-   **Protocol:** HTTP
+-   **Port:** 80
+-   **VPC:** `Vriddhi-VPC`
+-   **Health check path:** `/`
+-   **Success code:** `200`
+-   Registered the existing Web EC2 instance, `Vriddhi-Web`.
+
+The target became **Healthy**.
+
+### 8.4 Public Web Load Balancer
+
+Created:
+
+-   **Name:** `Vriddhi-Web-ALB`
+-   **Scheme:** Internet-facing
+-   **IP address type:** IPv4
+-   **VPC:** `Vriddhi-VPC`
+-   **Subnets:** `Public-Subnet-A` and `Public-Subnet-B`
+-   **Security group:** `Vriddhi-WebALB-SG`
+-   **Listener:** HTTP, port 80
+-   **Default action:** Forward to `Vriddhi-Web-TG`
+
+The application is accessed using the **DNS name** of `Vriddhi-Web-ALB`
+in a browser:
+
+``` text
+http://<Vriddhi-Web-ALB-DNS-name>
+```
+
+The ALB ARN identifies the AWS resource; it is not the address used to
+open the website.
+
+Both Web and App target groups were verified as **Healthy**.
+
+## Phase 9 -- Configure Frontend API Routing Through Nginx
+
+The React frontend is served by Nginx on the private Web EC2. The
+Node.js backend runs separately on the private App EC2.
+
+The browser must send API requests to the public Web ALB. Nginx then
+forwards `/api/` requests to the internal App ALB. The browser must not
+call the internal ALB directly because it is not internet-facing.
+
+### 9.1 Frontend API environment variable
+
+On the Web EC2, the frontend `.env` file was checked. It initially
+contained an empty value:
+
+``` env
+VITE_API_URL=
+```
+
+The `.env.example` file contained an old localhost example:
+
+``` env
+VITE_API_URL=http://localhost:4000
+```
+
+The frontend API URL was kept empty so the frontend can use relative API
+paths, such as `/api/auth/register`, through the same public Web ALB
+origin.
+
+Because Vite embeds environment variables during the frontend build, the
+frontend image was rebuilt after changing the configuration.
+
+### 9.2 Nginx reverse proxy configuration
+
+Updated `~/Vriddhi/frontend/nginx.conf` on the Web EC2:
+
+``` nginx
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Forward API requests to Internal App ALB
+    location /api/ {
+        proxy_pass http://internal-Vriddhi-App-ALB-2137928074.ap-south-1.elb.amazonaws.com;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Serve React application
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+This configuration sends requests such as:
+
+``` text
+POST /api/auth/register
+```
+
+from Nginx to:
+
+``` text
+http://internal-Vriddhi-App-ALB-2137928074.ap-south-1.elb.amazonaws.com/api/auth/register
+```
+
+### 9.3 Rebuild and restart the frontend container
+
+The frontend Docker image was rebuilt as `vriddhi-frontend:v4` after
+updating `.env` and `nginx.conf`.
+
+Commands used:
+
+``` bash
+cd ~/Vriddhi/frontend
+
+sudo docker build --no-cache -t vriddhi-frontend:v4 .
+
+sudo docker stop vriddhi-frontend
+sudo docker rm vriddhi-frontend
+
+sudo docker run -d --name vriddhi-frontend -p 80:80 vriddhi-frontend:v4
+
+sudo docker exec vriddhi-frontend nginx -t
+```
+
+Nginx configuration validation was completed.
+
+## Phase 10 -- Verify Connectivity and API
+
+### 10.1 Test Web EC2 to Internal App ALB
+
+From the Web EC2, ran:
+
+``` bash
+curl -i http://internal-Vriddhi-App-ALB-2137928074.ap-south-1.elb.amazonaws.com/health
+```
+
+The response returned:
+
+``` text
+HTTP/1.1 200 OK
+```
+
+This verified that the Web EC2 could reach the Internal App ALB and that
+the backend health endpoint responded successfully.
+
+### 10.2 Test the registration API directly
+
+From the Web EC2, tested the registration endpoint through the Internal
+App ALB:
+
+``` bash
+curl -i -X POST \
+  http://internal-Vriddhi-App-ALB-2137928074.ap-south-1.elb.amazonaws.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com","password":"TestPassword123!"}'
+```
+
+The response returned:
+
+``` text
+HTTP/1.1 201 Created
+```
+
+This verified that the registration API accepted the test request
+through the internal load balancer.
+
+A browser registration attempt still displayed a generic "Something went
+wrong" message during testing. The direct API test succeeded, so
+browser-side behavior still needs to be checked separately.
+
+## Phase 11 -- Access MongoDB Using MongoDB Compass
+
+MongoDB Compass was connected from the local Windows laptop through an
+SSH tunnel via the Bastion Host.
+
+### 11.1 Start the SSH tunnel
+
+Run this command in PowerShell on the laptop:
+
+``` powershell
+ssh -N -L 27018:10.0.21.198:27017 vriddhi-bastion
+```
+
+The command runs without displaying a success message when the tunnel is
+established. Keep the PowerShell window open while using Compass.
+
+### 11.2 MongoDB Compass connection string
+
+Use:
+
+``` text
+mongodb://vriddhiApp:<PASSWORD>@localhost:27018/vriddhi?authSource=vriddhi
+```
+
+Replace `<PASSWORD>` with the MongoDB application user's password. Do
+not save the actual password in this README.
+
+### 11.3 Verify stored registration data
+
+After connecting in Compass:
+
+1.  Open the `vriddhi` database.
+2.  Open the `users` collection.
+3.  Use **Find** to inspect documents.
+4.  Look for the test registration document, if it was created by the
+    API test.
+
+Passwords should be stored as password hashes, not plaintext values.
+
+The Compass connection uses the SSH tunnel for administration. The
+backend itself connects directly to MongoDB using the private IP
+`10.0.21.198`; it does not use the tunnel or Bastion.
 ---
