@@ -434,6 +434,18 @@ exit
 
 ## Phase 5 – SSH Access Through Bastion
 
+### 5.0 Configuring Jump Server when Required on Windows
+
+If both Bastion and MongoDB use Vriddhi.pem, use this command:
+```powershell
+ssh -i ".\Downloads\Vriddhi.pem" -o "ProxyCommand=ssh -i .\Downloads\Vriddhi.pem -o IdentitiesOnly=yes -W %h:%p ubuntu@13.127.133.75" -o IdentitiesOnly=yes ubuntu@10.0.21.198
+```
+
+If they use different keys, use:
+```powershell
+ssh -i ".\Downloads\etc.pem" -o "ProxyCommand=ssh -i .\Downloads\Vriddhi.pem -o IdentitiesOnly=yes -W %h:%p ubuntu@13.127.133.75" -o IdentitiesOnly=yes ubuntu@10.0.21.198
+```
+
 ### 5.1 Configure SSH on Windows
 
 Configured the Windows SSH client file:
