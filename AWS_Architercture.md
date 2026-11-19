@@ -172,6 +172,7 @@ SSH access is restricted to the administrator's public IP rather than being open
 | Type | Protocol | Port | Source | Purpose |
 |---|---|---:|---|---|
 | HTTP | TCP | 80 | `0.0.0.0/0` | Allows public HTTP requests to reach the Web Load Balancer |
+| HTTPS | TCP | 443 | `0.0.0.0/0` | Allows public HTTPS requests to reach the Web Load Balancer |
 
 HTTPS was not configured at this stage because an ACM certificate had not been configured.
 
@@ -214,6 +215,7 @@ The backend listens on port `4000`. The application EC2 instances are not intend
 | Type | Protocol | Port | Source | Purpose |
 |---|---|---:|---|---|
 | Custom TCP | TCP | 27017 | `Vriddhi-App-SG` | Allows the backend to connect to MongoDB |
+| Custom TCP | TCP | 27017 | `Vriddhi-Bastion-SG` | Allows the Bastion to connect to MongoDB | 
 | SSH | TCP | 22 | `Vriddhi-Bastion-SG` | Allows administrative SSH through Bastion |
 
 MongoDB's default port `27017` is allowed from the Application Security Group, not from the public internet.
