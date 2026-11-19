@@ -215,7 +215,6 @@ The backend listens on port `4000`. The application EC2 instances are not intend
 | Type | Protocol | Port | Source | Purpose |
 |---|---|---:|---|---|
 | Custom TCP | TCP | 27017 | `Vriddhi-App-SG` | Allows the backend to connect to MongoDB |
-| Custom TCP | TCP | 27017 | `Vriddhi-Bastion-SG` | Allows the Bastion to connect to MongoDB | 
 | SSH | TCP | 22 | `Vriddhi-Bastion-SG` | Allows administrative SSH through Bastion |
 
 MongoDB's default port `27017` is allowed from the Application Security Group, not from the public internet.
