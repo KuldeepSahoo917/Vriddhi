@@ -280,15 +280,100 @@ The MongoDB instance was launched without a public IP. It is accessed administra
 
 ---
 
-## Phase 4 – MongoDB Installation and Configuration
+## Phase 4 – SSH Access Through Bastion
 
-### 4.1 MongoDB Installation
+### 4.1 Configuring Jump Server when Required on Windows
+
+If both Bastion and MongoDB use Vriddhi.pem, use this command:
+```powershell
+ssh -i ".\Downloads\Vriddhi.pem" -o "ProxyCommand=ssh -i .\Downloads\Vriddhi.pem -o IdentitiesOnly=yes -W %h:%p ubuntu@13.127.133.75" -o IdentitiesOnly=yes ubuntu@10.0.21.198
+```
+
+If they use different keys, use:
+```powershell
+ssh -i ".\Downloads\etc.pem" -o "ProxyCommand=ssh -i .\Downloads\Vriddhi.pem -o IdentitiesOnly=yes -W %h:%p ubuntu@13.127.133.75" -o IdentitiesOnly=yes ubuntu@10.0.21.198
+```
+
+### 4.2 Configure SSH on Windows
+
+Configured the Windows SSH client file:
+
+```text
+C:\Users\<WINDOWS_USER>\.ssh\config
+```
+
+Added the following host aliases:
+
+```sshconfig
+Host vriddhi-bastion
+    HostName 13.127.133.75
+    User ubuntu
+    IdentityFile C:/Users/<WINDOWS_USER>/Downloads/Vriddhi.pem
+    IdentitiesOnly yes
+
+Host vriddhi-mongodb
+    HostName 10.0.21.198
+    User ubuntu
+    IdentityFile C:/Users/<WINDOWS_USER>/Downloads/Vriddhi.pem
+    IdentitiesOnly yes
+    ProxyJump vriddhi-bastion
+```
+
+Replace `<WINDOWS_USER>` with the actual Windows profile folder name.
+
+### 4.3 Verify SSH Configuration
+
+Executed in Windows PowerShell:
+
+```powershell
+ssh -G vriddhi-bastion | Select-String "hostname|user|identityfile"
+```
+
+This was used to verify the SSH alias, hostname, username, and identity file.
+
+### 4.4 Connect to Bastion
+
+From Windows CMD or PowerShell:
+
+```powershell
+ssh -i "C:\Users\<WINDOWS_USER>\Downloads\Vriddhi.pem" ubuntu@13.127.133.75
+```
+
+A successful connection displayed a prompt similar to:
+
+```text
+ubuntu@ip-10-0-1-67:~$
+```
+
+### 4.5 Connect to MongoDB Through ProxyJump
+
+From Windows CMD or PowerShell, executed:
+
+```powershell
+ssh vriddhi-mongodb
+```
+
+The SSH configuration automatically routes the connection through `vriddhi-bastion` to the MongoDB private IP `10.0.21.198`.
+
+To exit an SSH session:
+
+```bash
+exit
+```
+
+**Private-key security:** The `Vriddhi.pem` private key remains on the Windows laptop. It is not copied to the Bastion Host.
+
+---
+
+## Phase 5 – MongoDB Installation and Configuration
+
+### 5.1 MongoDB Installation
 
 Installed MongoDB Community Server 9.0 on `Vriddhi-MongoDB`.
 
 The MongoDB 9.0 signing key and Ubuntu `resolute` package repository were configured before installing the `mongodb-org` packages. The exact key-import and repository-add command lines were not retained in the session notes and are therefore not reproduced here.
 
-### 4.2 Start and Verify MongoDB
+### 5.2 Start and Verify MongoDB
 
 Restarted the MongoDB service:
 
@@ -304,7 +389,7 @@ sudo systemctl status mongod
 
 MongoDB was confirmed to be running and was enabled to start automatically at boot.
 
-### 4.3 Configure MongoDB Network Binding and Authentication
+### 5.3 Configure MongoDB Network Binding and Authentication
 
 Opened the MongoDB configuration file:
 
@@ -337,7 +422,7 @@ sudo systemctl restart mongod
 sudo systemctl status mongod
 ```
 
-### 4.4 Verify MongoDB Using MongoDB Shell
+### 5.4 Verify MongoDB Using MongoDB Shell
 
 Opened MongoDB Shell:
 
@@ -359,7 +444,7 @@ Expected successful response:
 
 This confirmed that MongoDB was responding.
 
-### 4.5 Create the Administrative User
+### 5.5 Create the Administrative User
 
 In MongoDB Shell:
 
@@ -377,7 +462,7 @@ db.createUser({
 
 The password was entered interactively and is not stored in this README.
 
-### 4.6 Create the Application Database and User
+### 5.6 Create the Application Database and User
 
 Selected the application database:
 
@@ -399,7 +484,7 @@ db.createUser({
 
 The `vriddhiApp` user has read/write permissions on the `vriddhi` database.
 
-### 4.7 Test MongoDB User Authentication
+### 5.7 Test MongoDB User Authentication
 
 Tested the administrative user:
 
@@ -429,91 +514,6 @@ exit
 ```
 
 **Application security:** The backend must use `vriddhiApp` for database access. The `vriddhiAdmin` account is reserved for administration.
-
----
-
-## Phase 5 – SSH Access Through Bastion
-
-### 5.0 Configuring Jump Server when Required on Windows
-
-If both Bastion and MongoDB use Vriddhi.pem, use this command:
-```powershell
-ssh -i ".\Downloads\Vriddhi.pem" -o "ProxyCommand=ssh -i .\Downloads\Vriddhi.pem -o IdentitiesOnly=yes -W %h:%p ubuntu@13.127.133.75" -o IdentitiesOnly=yes ubuntu@10.0.21.198
-```
-
-If they use different keys, use:
-```powershell
-ssh -i ".\Downloads\etc.pem" -o "ProxyCommand=ssh -i .\Downloads\Vriddhi.pem -o IdentitiesOnly=yes -W %h:%p ubuntu@13.127.133.75" -o IdentitiesOnly=yes ubuntu@10.0.21.198
-```
-
-### 5.1 Configure SSH on Windows
-
-Configured the Windows SSH client file:
-
-```text
-C:\Users\<WINDOWS_USER>\.ssh\config
-```
-
-Added the following host aliases:
-
-```sshconfig
-Host vriddhi-bastion
-    HostName 13.127.133.75
-    User ubuntu
-    IdentityFile C:/Users/<WINDOWS_USER>/Downloads/Vriddhi.pem
-    IdentitiesOnly yes
-
-Host vriddhi-mongodb
-    HostName 10.0.21.198
-    User ubuntu
-    IdentityFile C:/Users/<WINDOWS_USER>/Downloads/Vriddhi.pem
-    IdentitiesOnly yes
-    ProxyJump vriddhi-bastion
-```
-
-Replace `<WINDOWS_USER>` with the actual Windows profile folder name.
-
-### 5.2 Verify SSH Configuration
-
-Executed in Windows PowerShell:
-
-```powershell
-ssh -G vriddhi-bastion | Select-String "hostname|user|identityfile"
-```
-
-This was used to verify the SSH alias, hostname, username, and identity file.
-
-### 5.3 Connect to Bastion
-
-From Windows CMD or PowerShell:
-
-```powershell
-ssh -i "C:\Users\<WINDOWS_USER>\Downloads\Vriddhi.pem" ubuntu@13.127.133.75
-```
-
-A successful connection displayed a prompt similar to:
-
-```text
-ubuntu@ip-10-0-1-67:~$
-```
-
-### 5.4 Connect to MongoDB Through ProxyJump
-
-From Windows CMD or PowerShell, executed:
-
-```powershell
-ssh vriddhi-mongodb
-```
-
-The SSH configuration automatically routes the connection through `vriddhi-bastion` to the MongoDB private IP `10.0.21.198`.
-
-To exit an SSH session:
-
-```bash
-exit
-```
-
-**Private-key security:** The `Vriddhi.pem` private key remains on the Windows laptop. It is not copied to the Bastion Host.
 
 ---
 
