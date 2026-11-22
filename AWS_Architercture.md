@@ -855,4 +855,721 @@ Passwords should be stored as password hashes, not plaintext values.
 The Compass connection uses the SSH tunnel for administration. The
 backend itself connects directly to MongoDB using the private IP
 `10.0.21.198`; it does not use the tunnel or Bastion.
+
 ---
+# Vriddhi – AWS Deployment Documentation
+## Work Completed After the Previous README
+
+**Project:** Vriddhi – MERN Stack Application  
+**Repository:** https://github.com/KuldeepSahoo917/Vriddhi  
+**AWS Region:** Asia Pacific (Mumbai) – `ap-south-1`  
+**AWS Account ID:** `001800893431`  
+**Period Covered:** 19–21 November 2026
+
+---
+
+# Phase 8 – Preparing Launch Templates for Automated Deployment
+
+After completing the initial manual deployment and testing of the application, the next objective was to automate EC2 provisioning.
+
+Previously, the application was deployed manually on individual EC2 instances. The new architecture uses:
+
+- Launch Templates
+- EC2 User Data
+- Docker
+- Amazon ECR
+- Application Load Balancers
+- Target Groups
+- Auto Scaling Groups
+
+The existing launch templates were initially created for testing purposes:
+
+1. `Vriddhi-App-LT`
+2. `Vriddhi-Web-LT`
+
+Initially, their User Data sections were empty because Docker installation, image deployment, and application startup had been performed manually.
+
+The plan was to create updated launch template versions containing the required deployment scripts.
+
+## Deployment approach
+
+**Application tier:**
+
+1. Launch an EC2 instance using the App Launch Template.
+2. Install Docker and required utilities through User Data.
+3. Authenticate with Amazon ECR.
+4. Pull the backend Docker image.
+5. Retrieve backend configuration from AWS Secrets Manager.
+6. Create the backend environment file.
+7. Start the backend container on port 4000.
+8. Verify the backend health endpoint.
+
+**Web tier:**
+
+1. Launch an EC2 instance using the Web Launch Template.
+2. Install Docker and required utilities.
+3. Authenticate with Amazon ECR.
+4. Pull the frontend Docker image.
+5. Configure Nginx to communicate with the internal Application Load Balancer.
+6. Start the frontend container on port 80.
+
+---
+
+# Phase 9 – Creating Amazon ECR Repositories
+
+Amazon Elastic Container Registry (ECR) was introduced to store the Docker images of the frontend and backend applications.
+
+Two private repositories were created.
+
+| Repository | Purpose |
+|---|---|
+| `vriddhi-backend` | Stores the Node.js backend Docker image |
+| `vriddhi-frontend` | Stores the React frontend Docker image |
+
+Both repositories were created in the Mumbai region.
+
+**Registry URI:**
+
+`001800893431.dkr.ecr.ap-south-1.amazonaws.com`
+
+The images are stored separately because the frontend and backend are deployed on different EC2 Auto Scaling Groups.
+
+---
+
+# Phase 10 – Configuring the Backend Build Process
+
+A CodeBuild project was created to build the backend Docker image and push it to ECR.
+
+**CodeBuild project:** `Vriddhi-Backend-Build`
+
+The project uses the Vriddhi GitHub repository as its source.
+
+Repository:
+
+`https://github.com/KuldeepSahoo917/Vriddhi`
+
+The backend source is located in the backend directory.
+
+## Backend build process
+
+The build process performs the following operations:
+
+1. Retrieves the source code from GitHub.
+2. Authenticates Docker with Amazon ECR.
+3. Builds the backend Docker image.
+4. Tags the image.
+5. Pushes the image to the private ECR repository.
+
+The image is published using:
+
+`vriddhi-backend:latest`
+
+The first backend CodeBuild execution completed successfully.
+
+The backend image was available in the `vriddhi-backend` ECR repository.
+
+---
+
+# Phase 11 – Configuring Backend Secrets in AWS Secrets Manager
+
+The backend requires environment variables to connect to MongoDB and external services.
+
+Instead of placing sensitive configuration directly inside the Docker image or Launch Template, AWS Secrets Manager was used.
+
+The backend secret was created as:
+
+`Vriddhi/Production/Backend`
+
+Its ARN:
+
+`arn:aws:secretsmanager:ap-south-1:001800893431:secret:Vriddhi/Production/Backend-wRDCuB`
+
+The secret contains the backend environment configuration required by the application.
+
+The backend EC2 instances retrieve this configuration during startup.
+
+The secret is not exposed in the Docker image.
+
+---
+
+# Phase 12 – Configuring the Application Launch Template
+
+The `Vriddhi-App-LT` Launch Template was updated with deployment automation.
+
+The configuration includes:
+
+| Setting | Configuration |
+|---|---|
+| Launch Template | `Vriddhi-App-LT` |
+| Operating System | Ubuntu |
+| Instance Type | `t3.small` |
+| Key Pair | `Vriddhi` |
+| Security Group | `Vriddhi-App-SG` |
+| Storage | 20 GiB gp3 |
+| Region | `ap-south-1` |
+| Docker Image | `vriddhi-backend:latest` |
+| Container Port | 4000 |
+
+## Backend User Data
+
+The User Data script was designed to automate backend deployment whenever a new App EC2 instance launches.
+
+The script performs these operations in order:
+
+1. Starts a log file at `/var/log/vriddhi-user-data.log`.
+2. Installs Docker.
+3. Installs AWS CLI and required utilities such as `jq` and `curl`.
+4. Starts and enables Docker.
+5. Authenticates with the ECR registry.
+6. Pulls the latest backend image.
+7. Retrieves the backend secret from Secrets Manager.
+8. Creates the directory `/opt/vriddhi`.
+9. Writes the environment configuration to `/opt/vriddhi/backend.env`.
+10. Restricts the environment file permissions.
+11. Starts the backend Docker container.
+12. Maps host port 4000 to container port 4000.
+13. Checks the backend `/health` endpoint.
+
+The backend container is named:
+
+`vriddhi-backend`
+
+The application listens on port:
+
+`4000`
+
+## User Data troubleshooting
+
+During testing, the initial User Data script failed to execute.
+
+The issue was caused by an extra newline character before:
+
+`#!/bin/bash`
+
+The first byte of the script was `0a`, meaning the shebang was not at the beginning of the file.
+
+This caused a cloud-init execution error:
+
+`Exec format error`
+
+The script was corrected by removing the leading whitespace and placing the shebang at the very beginning.
+
+A new launch template version was created.
+
+**Final working version:** Version 3
+
+Version 3 was selected as the default version.
+
+The corrected User Data successfully deployed the backend container.
+
+---
+
+# Phase 13 – Creating the Application Target Group
+
+A target group was created for the backend EC2 instances.
+
+**Target Group:** `Vriddhi-App-TG`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Target Type | Instances |
+| Protocol | HTTP |
+| Port | 4000 |
+| VPC | `Vriddhi-VPC` |
+| Health Check Protocol | HTTP |
+| Health Check Path | `/health` |
+| Success Code | 200 |
+
+The target group checks whether the Node.js backend is healthy.
+
+Only healthy targets should receive application traffic from the internal load balancer.
+
+---
+
+# Phase 14 – Creating the Internal Application Load Balancer
+
+An internal Application Load Balancer was created for the backend tier.
+
+**Name:** `Vriddhi-App-ALB`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Scheme | Internal |
+| Type | Application Load Balancer |
+| VPC | `Vriddhi-VPC` |
+| Availability Zones | ap-south-1a and ap-south-1b |
+| Subnets | Private-App-Subnet-A and Private-App-Subnet-B |
+| Security Group | `Vriddhi-AppALB-SG` |
+
+## Listener configuration
+
+A listener was created with:
+
+- Protocol: HTTP
+- Port: 80
+- Default action: Forward to `Vriddhi-App-TG`
+
+The internal ALB DNS name is:
+
+`internal-Vriddhi-App-ALB-2137928074.ap-south-1.elb.amazonaws.com`
+
+This load balancer is not publicly accessible.
+
+It receives traffic from the Web tier and forwards it to healthy backend instances.
+
+---
+
+# Phase 15 – Creating the Application Auto Scaling Group
+
+After configuring the backend Launch Template and internal ALB, the Application Auto Scaling Group was created.
+
+**Auto Scaling Group:** `Vriddhi-App-ASG`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Launch Template | `Vriddhi-App-LT` |
+| Launch Template Version | Version 3 |
+| Instance Type | `t3.small` |
+| Availability Zones | ap-south-1a and ap-south-1b |
+| Subnets | Private-App-Subnet-A and Private-App-Subnet-B |
+| Minimum Capacity | 2 |
+| Desired Capacity | 2 |
+| Maximum Capacity | 4 |
+| Target Group | `Vriddhi-App-TG` |
+| Health Checks | EC2 and ELB |
+| Health Check Grace Period | 300 seconds |
+
+The ASG automatically launches two backend instances in separate Availability Zones.
+
+The instances are registered with `Vriddhi-App-TG`.
+
+## Application tier migration
+
+Initially, a manually configured backend EC2 instance was being used.
+
+After the ASG instances were successfully launched and verified:
+
+1. Both ASG instances became healthy.
+2. Backend health checks succeeded.
+3. The application was tested using the new backend instances.
+4. Login functionality was tested successfully.
+5. The original manually created backend EC2 instance was deregistered from the target group.
+6. The original manual backend EC2 instance was terminated.
+
+The Application tier was now managed by the Auto Scaling Group.
+
+---
+
+# Phase 16 – Preparing the Frontend Build Configuration
+
+After completing the backend migration, the frontend build process was configured.
+
+The frontend Docker image needed to be built and stored separately in ECR.
+
+A frontend buildspec file was created at:
+
+`frontend/buildspec.yml`
+
+The file was committed and pushed to the GitHub repository.
+
+## Frontend build process
+
+The build process performs these operations:
+
+1. Retrieves the frontend source code from GitHub.
+2. Authenticates with Amazon ECR.
+3. Builds the frontend Docker image.
+4. Tags the image.
+5. Pushes the image to the frontend ECR repository.
+
+The image is published as:
+
+`vriddhi-frontend:latest`
+
+The frontend Docker build also receives the Google OAuth Client ID as a build argument:
+
+`VITE_GOOGLE_CLIENT_ID`
+
+The frontend image is stored in:
+
+`001800893431.dkr.ecr.ap-south-1.amazonaws.com/vriddhi-frontend:latest`
+
+The ECR push permissions were updated to allow the frontend and backend repositories to be used by the build process.
+
+---
+
+# Phase 17 – Creating the Frontend CodeBuild Project
+
+A separate CodeBuild project was created for the frontend.
+
+**Project Name:** `Vriddhi-Frontend-Build`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Source Provider | GitHub |
+| Repository | `KuldeepSahoo917/Vriddhi` |
+| Branch | `main` |
+| Buildspec | `frontend/buildspec.yml` |
+| Environment | Managed Ubuntu Standard 7.0 |
+| Privileged Mode | Enabled |
+| Build Output | Amazon ECR |
+
+The frontend build completed successfully.
+
+The new frontend Docker image was pushed to the `vriddhi-frontend` ECR repository.
+
+The frontend image was now available for automated EC2 deployment.
+
+---
+
+# Phase 18 – Configuring the Frontend Nginx Reverse Proxy
+
+The frontend Nginx configuration was updated to forward backend API requests to the internal Application Load Balancer.
+
+The frontend does not communicate directly with the backend EC2 private IP addresses.
+
+Instead, the request flow is:
+
+`Browser → Public Web ALB → Web EC2 → Nginx → Internal App ALB → Backend EC2`
+
+The frontend uses relative API paths such as:
+
+`/api/auth/login`
+
+The frontend's `VITE_API_URL` is intentionally left blank so that API requests use the same origin.
+
+## Nginx configuration
+
+The configuration uses an environment variable called:
+
+`APP_ALB_DNS`
+
+The Web container receives the internal Application Load Balancer DNS name during startup.
+
+Nginx configuration:
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://${APP_ALB_DNS};
+
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+This configuration ensures:
+
+- React frontend files are served through Nginx.
+- API requests are forwarded to the internal ALB.
+- The internal ALB distributes requests across backend instances.
+- React Router routes are handled through `index.html`.
+
+The frontend Docker image was rebuilt and pushed to ECR with the updated configuration.
+
+---
+
+# Phase 19 – Configuring the Web Launch Template
+
+The `Vriddhi-Web-LT` Launch Template was updated to automate frontend deployment.
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Launch Template | `Vriddhi-Web-LT` |
+| Operating System | Ubuntu |
+| Instance Type | `t3.small` |
+| Key Pair | `Vriddhi` |
+| Security Group | `Vriddhi-Web-SG` |
+| Storage | 20 GiB gp3 |
+| Docker Image | `vriddhi-frontend:latest` |
+| Container Port | 80 |
+| Application Load Balancer | Internal App ALB |
+
+## Web User Data
+
+The User Data script automates the frontend deployment.
+
+Its operations include:
+
+1. Installs Docker.
+2. Installs AWS CLI and required utilities.
+3. Starts Docker.
+4. Authenticates with Amazon ECR.
+5. Pulls the frontend image.
+6. Supplies the internal Application Load Balancer DNS through `APP_ALB_DNS`.
+7. Starts the frontend container.
+8. Maps host port 80 to container port 80.
+9. Checks the frontend using a local HTTP request.
+
+The container is named:
+
+`vriddhi-frontend`
+
+The Web instances use the private internal ALB DNS to forward API requests.
+
+---
+
+# Phase 20 – Creating the Web Target Group
+
+A target group was created for the frontend EC2 instances.
+
+**Target Group:** `Vriddhi-Web-TG`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Target Type | Instances |
+| Protocol | HTTP |
+| Port | 80 |
+| Health Check Protocol | HTTP |
+| Health Check Path | `/` |
+| Success Code | 200 |
+
+The target group checks whether Nginx is serving the frontend successfully.
+
+---
+
+# Phase 21 – Creating the Public Web Application Load Balancer
+
+A public-facing Application Load Balancer was created for the frontend.
+
+**Name:** `Vriddhi-Web-ALB`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Scheme | Internet-facing |
+| Type | Application Load Balancer |
+| VPC | `Vriddhi-VPC` |
+| Availability Zones | ap-south-1a and ap-south-1b |
+| Subnets | Public-Subnet-A and Public-Subnet-B |
+| Security Group | `Vriddhi-WebALB-SG` |
+
+## Listener configuration
+
+The listener was configured as:
+
+- Protocol: HTTP
+- Port: 80
+- Default action: Forward to `Vriddhi-Web-TG`
+
+The public ALB is the entry point for application users.
+
+It distributes incoming requests across healthy Web EC2 instances.
+
+---
+
+# Phase 22 – Creating the Web Auto Scaling Group
+
+After configuring the Web Launch Template and public ALB, the Web Auto Scaling Group was created.
+
+**Auto Scaling Group:** `Vriddhi-Web-ASG`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Launch Template | `Vriddhi-Web-LT` |
+| Launch Template Version | Latest working default version |
+| Instance Type | `t3.small` |
+| Availability Zones | ap-south-1a and ap-south-1b |
+| Subnets | Private-Presentation-Subnet-A and Private-Presentation-Subnet-B |
+| Minimum Capacity | 2 |
+| Desired Capacity | 2 |
+| Maximum Capacity | 4 |
+| Target Group | `Vriddhi-Web-TG` |
+| Health Checks | EC2 and ELB |
+| Health Check Grace Period | 300 seconds |
+
+The Web ASG automatically launches two frontend instances in separate Availability Zones.
+
+Both instances register with `Vriddhi-Web-TG`.
+
+---
+
+# Phase 23 – Configuring Web Tier Target Tracking Scaling
+
+A target tracking scaling policy was configured for the Web Auto Scaling Group.
+
+**Policy Name:**
+
+`Vriddhi-Web-CPU-Target-Tracking`
+
+Configuration:
+
+| Setting | Value |
+|---|---|
+| Metric | Average CPU Utilization |
+| Target Value | 50% |
+| Instance Warmup | 300 seconds |
+| Scale-In | Enabled |
+
+The scaling policy allows AWS to adjust the number of Web instances based on average CPU utilization.
+
+If CPU utilization increases above the target, the ASG can launch additional instances, up to the maximum capacity of four.
+
+When demand decreases, the ASG can scale in while respecting its minimum capacity of two.
+
+---
+
+# Phase 24 – Migrating the Web Tier from Manual EC2 to ASG
+
+Initially, the frontend was deployed on a manually configured Web EC2 instance.
+
+After the Web Launch Template and Web ASG were configured:
+
+1. Two Web ASG instances launched successfully.
+2. Both instances registered with the Web target group.
+3. Both instances passed their health checks.
+4. The frontend was tested through the public Web ALB.
+5. A temporary test Web EC2 instance was terminated after the ASG deployment was verified.
+6. The original manually configured Web EC2 instance was also terminated after migration.
+
+The Web tier was now managed by `Vriddhi-Web-ASG`.
+
+---
+
+# Phase 25 – Testing Web Auto Scaling Self-Healing
+
+A self-healing test was performed on the Web Auto Scaling Group.
+
+The purpose was to confirm that AWS automatically replaces an unhealthy or terminated instance.
+
+The test procedure:
+
+1. Confirmed that two Web ASG instances were running.
+2. Confirmed that both Web target group targets were healthy.
+3. One Web ASG instance was terminated manually for testing.
+4. The Auto Scaling Group detected that the number of instances had fallen below desired capacity.
+5. The ASG automatically launched a replacement instance.
+6. The replacement instance completed its User Data deployment.
+7. The replacement registered with `Vriddhi-Web-TG`.
+8. The replacement passed its health checks.
+9. The ASG returned to two running instances.
+10. The application was tested again through the public Web ALB.
+
+The application continued working after the replacement.
+
+This confirmed that the Web Auto Scaling Group could automatically recover from an instance termination.
+
+---
+
+# Final Architecture
+
+The Vriddhi application now uses a three-tier AWS architecture.
+
+```text
+                         INTERNET
+                             |
+                             |
+                    Public Web ALB
+                    (HTTP Port 80)
+                             |
+                             |
+                     Vriddhi-Web-TG
+                             |
+                 -----------------------
+                 |                     |
+           Web EC2 - AZ A        Web EC2 - AZ B
+                 |                     |
+                 -----------------------
+                             |
+                       Nginx Proxy
+                             |
+                             |
+                    Internal App ALB
+                    (HTTP Port 80)
+                             |
+                             |
+                     Vriddhi-App-TG
+                             |
+                 -----------------------
+                 |                     |
+           App EC2 - AZ A        App EC2 - AZ B
+                 |                     |
+                 -----------------------
+                             |
+                       Node.js API
+                       (Port 4000)
+                             |
+                             |
+                      MongoDB EC2
+                    (Port 27017)
+                    Private DB Subnet
+```
+
+## AWS Services Used
+
+| AWS Service | Purpose |
+|---|---|
+| Amazon VPC | Isolated network for the application |
+| EC2 | Runs frontend, backend, and MongoDB |
+| Launch Templates | Defines EC2 launch configuration |
+| Auto Scaling Groups | Maintains and replaces EC2 instances |
+| Application Load Balancer | Distributes traffic across instances |
+| Target Groups | Registers instances and performs health checks |
+| Amazon ECR | Stores frontend and backend Docker images |
+| AWS CodeBuild | Builds and pushes Docker images |
+| AWS Secrets Manager | Stores backend environment configuration |
+| Amazon CloudWatch | Provides metrics used by Auto Scaling |
+
+## Final Configuration Summary
+
+| Component | Resource | Configuration |
+|---|---|---|
+| Public Load Balancer | `Vriddhi-Web-ALB` | Internet-facing |
+| Web Target Group | `Vriddhi-Web-TG` | HTTP 80, `/` |
+| Web Launch Template | `Vriddhi-Web-LT` | Docker frontend deployment |
+| Web Auto Scaling Group | `Vriddhi-Web-ASG` | Min 2, Desired 2, Max 4 |
+| Internal Load Balancer | `Vriddhi-App-ALB` | Internal |
+| App Target Group | `Vriddhi-App-TG` | HTTP 4000, `/health` |
+| App Launch Template | `Vriddhi-App-LT` | Version 3 |
+| App Auto Scaling Group | `Vriddhi-App-ASG` | Min 2, Desired 2, Max 4 |
+| Frontend ECR | `vriddhi-frontend` | Frontend Docker image |
+| Backend ECR | `vriddhi-backend` | Backend Docker image |
+| Frontend CodeBuild | `Vriddhi-Frontend-Build` | Frontend image build |
+| Backend CodeBuild | `Vriddhi-Backend-Build` | Backend image build |
+| Database | MongoDB EC2 | Private DB subnet |
+
+## Deployment Architecture Achievements
+
+- Migrated the backend from a manually configured EC2 instance to an Auto Scaling Group.
+- Migrated the frontend from a manually configured EC2 instance to an Auto Scaling Group.
+- Created separate private ECR repositories for frontend and backend.
+- Configured separate CodeBuild projects for frontend and backend Docker images.
+- Automated backend Docker deployment using EC2 User Data.
+- Automated frontend Docker deployment using EC2 User Data.
+- Configured backend secrets retrieval through AWS Secrets Manager.
+- Configured Nginx to forward API requests to the internal Application Load Balancer.
+- Configured separate public and internal Application Load Balancers.
+- Distributed frontend and backend instances across two Availability Zones.
+- Configured health checks for both application tiers.
+- Configured CPU-based target tracking for the Web ASG.
+- Successfully tested automatic Web instance replacement.
+
